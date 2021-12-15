@@ -9,6 +9,8 @@ Fetch county-level COVID data from the state of Colorado.
 from __future__ import annotations
 from meerschaum.utils.typing import Optional, Dict, Any
 
+import datetime
+__version__ = '0.1.0'
 BASE_URL = 'https://services3.arcgis.com/66aUo8zsujfVXRIT/arcgis/rest/services/colorado_covid19_county_statistics_cumulative/FeatureServer/0/query'
 required = ['requests', 'python-dateutil']
 
@@ -65,6 +67,7 @@ def fetch(
     where = f"FIPS IN ({fips_where}) AND Metric IN ('Cases', 'Deaths')"
     begin = begin if begin is not None else pipe.get_sync_time(debug=debug)
     if begin is not None:
+        begin -= datetime.timedelta(days=2)
         where += f" AND CAST(Date AS DATE) >= CAST(\'{begin.strftime('%m/%d/%Y')}\' AS DATE)"
     if end is not None:
         where += f" AND CAST(Date AS DATE) <= CAST(\'{end.strftime('%m/%d/%Y')}\' AS DATE)"
