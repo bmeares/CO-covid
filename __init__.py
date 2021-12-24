@@ -10,9 +10,21 @@ from __future__ import annotations
 from meerschaum.utils.typing import Optional, Dict, Any
 
 import datetime
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 BASE_URL = 'https://services3.arcgis.com/66aUo8zsujfVXRIT/arcgis/rest/services/colorado_covid19_county_statistics_cumulative/FeatureServer/0/query'
 required = ['requests', 'python-dateutil']
+
+skip_arapahoe_dates = set()
+def _init_skip_dates():
+    """
+    Arapahoe County reports invalid data every 50 days.
+    """
+    _date = datetime.datetime(2020, 5, 29, 0, 0)
+    for i in range(100):
+        skip_arapahoe_dates.add(_date)
+        _date += datetime.timedelta(days=50)
+_init_skip_dates()
+
 
 def register(pipe: meerschaum.Pipe, **kw):
     from meerschaum.utils.warnings import warn
@@ -71,6 +83,8 @@ def fetch(
         where += f" AND CAST(Date AS DATE) >= CAST(\'{begin.strftime('%m/%d/%Y')}\' AS DATE)"
     if end is not None:
         where += f" AND CAST(Date AS DATE) <= CAST(\'{end.strftime('%m/%d/%Y')}\' AS DATE)"
+
+
     params = {
         'where': where,
         'outFields': 'COUNTY,FIPS,Metric,Value,Date',
@@ -102,7 +116,10 @@ def fetch(
         attrs = row['attributes']
         if attrs['Metric'] == 'Cases':
             continue
-        final_data['date'].append(parser.parse(attrs['Date']))
+        date = parser.parse(attrs['Date'])
+        if attrs['FIPS'] == '005' and date in skip_arapahoe_dates:
+            continue
+        final_data['date'].append(date)
         final_data['county'].append(attrs['COUNTY'].lower().capitalize())
         final_data['fips'].append('08' + attrs['FIPS'])
         final_data['deaths'].append(int(attrs['Value']))
@@ -110,3 +127,4 @@ def fetch(
     if debug:
         pprint(final_data)
     return final_data
+
